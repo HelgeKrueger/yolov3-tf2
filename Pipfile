@@ -1,0 +1,16 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+tensorflow = "==2.1.0rc1"
+opencv-python = "==4.1.1.26"
+lxml = "*"
+tqdm = "*"
+yolov3-tf2 = {editable = true,file = "file:///home/helge/projects/github/yolov3-tf2"}
+
+[requires]
+python_version = "3.7"
