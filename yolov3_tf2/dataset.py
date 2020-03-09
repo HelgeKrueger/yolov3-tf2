@@ -1,5 +1,8 @@
 import tensorflow as tf
 from absl.flags import FLAGS
+import cv2
+import hashlib
+
 
 @tf.function
 def transform_targets_for_output(y_true, grid_size, anchor_idxs):
@@ -142,3 +145,53 @@ def load_fake_dataset():
     y_train = tf.expand_dims(y_train, axis=0)
 
     return tf.data.Dataset.from_tensor_slices((x_train, y_train))
+
+
+def create_tfrecord(filename, boxes):
+    img = cv2.imread(filename, cv2.IMREAD_ANYCOLOR)
+    img_raw = cv2.imencode('.jpg', img)[1].tostring()
+    key = hashlib.sha256(img_raw).hexdigest()
+
+    height, width, _ = img.shape
+
+    xmin = []
+    xmax = []
+    ymin = []
+    ymax = []
+    classes_text = []
+    classes = []
+    difficult_obj = []
+    truncated = []
+    views = []
+
+    for box in boxes:
+        xmin.append(float(box[0]) / width)
+        ymin.append(float(box[1]) / height)
+        xmax.append(float(box[2]) / width)
+        ymax.append(float(box[3]) / height)
+        classes_text.append(box[5].encode('utf8'))
+        classes.append(box[4])
+        difficult_obj.append(0)
+        truncated.append(0)
+        views.append('?'.encode('utf8'))
+
+    return tf.train.Example(features=tf.train.Features(feature={
+        'image/height': tf.train.Feature(int64_list=tf.train.Int64List(value=[height])),
+        'image/width': tf.train.Feature(int64_list=tf.train.Int64List(value=[width])),
+        'image/filename': tf.train.Feature(bytes_list=tf.train.BytesList(value=[
+            filename.encode('utf8')])),
+        'image/source_id': tf.train.Feature(bytes_list=tf.train.BytesList(value=[
+            filename.encode('utf8')])),
+        'image/key/sha256': tf.train.Feature(bytes_list=tf.train.BytesList(value=[key.encode('utf8')])),
+        'image/encoded': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_raw])),
+        'image/format': tf.train.Feature(bytes_list=tf.train.BytesList(value=['jpeg'.encode('utf8')])),
+        'image/object/bbox/xmin': tf.train.Feature(float_list=tf.train.FloatList(value=xmin)),
+        'image/object/bbox/xmax': tf.train.Feature(float_list=tf.train.FloatList(value=xmax)),
+        'image/object/bbox/ymin': tf.train.Feature(float_list=tf.train.FloatList(value=ymin)),
+        'image/object/bbox/ymax': tf.train.Feature(float_list=tf.train.FloatList(value=ymax)),
+        'image/object/class/text': tf.train.Feature(bytes_list=tf.train.BytesList(value=classes_text)),
+        'image/object/class/label': tf.train.Feature(int64_list=tf.train.Int64List(value=classes)),
+        'image/object/difficult': tf.train.Feature(int64_list=tf.train.Int64List(value=difficult_obj)),
+        'image/object/truncated': tf.train.Feature(int64_list=tf.train.Int64List(value=truncated)),
+        'image/object/view': tf.train.Feature(bytes_list=tf.train.BytesList(value=views)),
+    }))
